@@ -1,43 +1,45 @@
 import { translations } from './translations'
 
-const DEFAULT_REMOTE_BASE = 'https://video.training.tecshield.net'
+
+const rawBaseUrl = 'https://video.training.tecshield.net'
 const normalizeBaseUrl = (url) => {
   if (!url) return ''
   return url.endsWith('/') ? url.slice(0, -1) : url
 }
 
-const remoteBase = normalizeBaseUrl(
-  process.env.NEXT_PUBLIC_VIDEO_DEPLOYED || DEFAULT_REMOTE_BASE
-)
+const frontendBase = normalizeBaseUrl(process.env.NEXT_PUBLIC_FRONTEND_URL || rawBaseUrl)
 
 const buildAssetUrl = (path) => {
   if (!path) return ''
+  if (!frontendBase) {
+    return path
+  }
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  return `${remoteBase}${normalizedPath}`
+  return `${frontendBase}${normalizedPath}`
 }
 
 const getTrainingData = (lang = 'en') => {
   const currentLang = lang === 'ar' ? 'ar' : 'en'
   const t = (key) => translations[currentLang]?.[key] || translations['en'][key] || key
-  const remoteVideoPaths = {
+  const videoPaths = {
     fire: {
       en: '/videos/fire-english.mp4',
-      ar: '/videos/Fire-Arabic.mp4'
+      ar: '/videos/fire-arabic.mp4'
     },
     cpr: {
-      en: '/videos/Cpr-English.mp4',
-      ar: '/videos/Cpr-Arabic.mp4'
+      en: '/videos/cpr-english.mp4',
+      ar: '/videos/cpr-arabic.mp4'
     }
   }
 
   const videoSources = {
     fire: {
-      en: buildAssetUrl(remoteVideoPaths.fire.en),
-      ar: buildAssetUrl(remoteVideoPaths.fire.ar)
+      en: buildAssetUrl(videoPaths.fire.en),
+      ar: buildAssetUrl(videoPaths.fire.ar)
     },
     cpr: {
-      en: buildAssetUrl(remoteVideoPaths.cpr.en),
-      ar: buildAssetUrl(remoteVideoPaths.cpr.ar)
+      en: buildAssetUrl(videoPaths.cpr.en),
+      ar: buildAssetUrl(videoPaths.cpr.ar)
     }
   }
   return {
