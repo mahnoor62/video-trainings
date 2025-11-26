@@ -26,11 +26,11 @@ const getTrainingData = (lang = 'en') => {
   const videoSources = {
     fire: {
       en: buildAssetUrl('/videos/fire-english.mp4'),
-      ar: buildAssetUrl('/videos/fire-arabic.mp4')
+      ar: buildAssetUrl('/videos/Fire-Arabic.mp4')
     },
     cpr: {
-      en: buildAssetUrl('/videos/cpr-english.mp4'),
-      ar: buildAssetUrl('/videos/cpr-arabic.mp4')
+      en: buildAssetUrl('/videos/Cpr-English.mp4'),
+      ar: buildAssetUrl('/videos/Cpr-Arabic.mp4')
     }
   }
   return {
