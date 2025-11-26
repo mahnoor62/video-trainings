@@ -24,11 +24,11 @@ const getTrainingData = (lang = 'en') => {
   const videoPaths = {
     fire: {
       en: '/videos/fire-english.mp4',
-      ar: '/videos/fire-arabic.mp4'
+      ar: '/videos/Fire-Arabic.mp4'
     },
     cpr: {
-      en: '/videos/cpr-english.mp4',
-      ar: '/videos/cpr-arabic.mp4'
+      en: '/videos/Cpr-English.mp4',
+      ar: '/videos/Cpr-Arabic.mp4'
     }
   }
 
