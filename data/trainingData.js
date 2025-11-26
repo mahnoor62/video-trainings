@@ -1,17 +1,36 @@
 import { translations } from './translations'
 
+const rawBaseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL
+
+const normalizeBaseUrl = (url) => {
+  if (!url) return ''
+  return url.endsWith('/') ? url.slice(0, -1) : url
+}
+
+const baseUrl = normalizeBaseUrl(rawBaseUrl)
+
+const buildAssetUrl = (path) => {
+  if (!path) return ''
+  const isAbsolute = /^https?:\/\//i.test(path)
+  if (isAbsolute || !baseUrl) {
+    return path
+  }
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${baseUrl}${normalizedPath}`
+}
+
 const getTrainingData = (lang = 'en') => {
   const currentLang = lang === 'ar' ? 'ar' : 'en'
   const t = (key) => translations[currentLang]?.[key] || translations['en'][key] || key
 
   const videoSources = {
     fire: {
-      en: '/videos/fire-english.mp4',
-      ar: '/videos/fire-arabic.mp4'
+      en: buildAssetUrl('/videos/fire-english.mp4'),
+      ar: buildAssetUrl('/videos/fire-arabic.mp4')
     },
     cpr: {
-      en: '/videos/cpr-english.mp4',
-      ar: '/videos/cpr-arabic.mp4'
+      en: buildAssetUrl('/videos/cpr-english.mp4'),
+      ar: buildAssetUrl('/videos/cpr-arabic.mp4')
     }
   }
   return {
