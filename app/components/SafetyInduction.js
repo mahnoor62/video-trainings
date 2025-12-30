@@ -13,7 +13,9 @@ import {
 import {
   ArrowBack,
   PlayArrow,
-  Pause
+  Pause,
+  Fullscreen,
+  FullscreenExit
 } from '@mui/icons-material'
 import { useLanguage } from '../contexts/LanguageContext'
 
@@ -80,7 +82,9 @@ export default function SafetyInduction({ onBack }) {
   const [segmentEndTime, setSegmentEndTime] = useState(null)
   const [wasCorrectAnswer, setWasCorrectAnswer] = useState(null)
   const [currentQuestionData, setCurrentQuestionData] = useState(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const pauseTimeoutRef = useRef(null)
+  const videoContainerRef = useRef(null)
 
   useEffect(() => {
     const videoElement = videoRef.current
@@ -237,6 +241,60 @@ export default function SafetyInduction({ onBack }) {
     videoElement.currentTime = newTime
     setCurrentTime(newTime)
   }
+
+  const handleFullscreen = async () => {
+    const container = videoContainerRef.current
+    if (!container) return
+
+    try {
+      if (!isFullscreen) {
+        if (container.requestFullscreen) {
+          await container.requestFullscreen()
+        } else if (container.webkitRequestFullscreen) {
+          await container.webkitRequestFullscreen()
+        } else if (container.mozRequestFullScreen) {
+          await container.mozRequestFullScreen()
+        } else if (container.msRequestFullscreen) {
+          await container.msRequestFullscreen()
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen()
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen()
+        } else if (document.mozCancelFullScreen) {
+          await document.mozCancelFullScreen()
+        } else if (document.msExitFullscreen) {
+          await document.msExitFullscreen()
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling fullscreen:', error)
+    }
+  }
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      )
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange)
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
+    }
+  }, [])
 
   const formatTime = (time) => {
     if (!time || isNaN(time)) return '0:00'
@@ -407,6 +465,7 @@ export default function SafetyInduction({ onBack }) {
         }}
       >
         <Box
+          ref={videoContainerRef}
           sx={{
             position: 'relative',
             width: '100%',
@@ -423,6 +482,8 @@ export default function SafetyInduction({ onBack }) {
               objectFit: 'contain'
             }}
             playsInline
+            controls={false}
+            onContextMenu={(e) => e.preventDefault()}
           />
 
           {/* Question Overlay */}
@@ -533,55 +594,30 @@ export default function SafetyInduction({ onBack }) {
             </Box>
           )}
 
-          {/* Video Controls Overlay */}
+          {/* Fullscreen Button Only */}
           <Box
             sx={{
               position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-              p: 2
+              bottom: 16,
+              right: 16,
+              zIndex: 5
             }}
           >
-            <Box
-              onClick={handleSeek}
+            <Button
+              onClick={handleFullscreen}
               sx={{
-                cursor: 'pointer',
-                position: 'relative',
-                mb: 2
+                color: 'white',
+                minWidth: 'auto',
+                padding: '12px',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                borderRadius: '8px',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                }
               }}
             >
-              <LinearProgress
-                variant="determinate"
-                value={progress}
-                sx={{
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: 'rgba(255,255,255,0.3)',
-                  '& .MuiLinearProgress-bar': {
-                    background: 'linear-gradient(90deg, #e31b23 0%, #333092 100%)'
-                  }
-                }}
-              />
-            </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Button
-                onClick={handlePlay}
-                sx={{
-                  color: 'white',
-                  minWidth: 'auto',
-                  padding: '8px'
-                }}
-              >
-                {isPlaying ? <Pause /> : <PlayArrow />}
-              </Button>
-
-              <Typography variant="body2" sx={{ color: 'white', minWidth: 100 }}>
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </Typography>
-            </Box>
+              {isFullscreen ? <FullscreenExit /> : <Fullscreen />}
+            </Button>
           </Box>
         </Box>
       </Card>
