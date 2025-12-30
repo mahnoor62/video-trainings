@@ -18,13 +18,14 @@ import VideoPlayer from './components/VideoPlayer'
 import QuizComponent from './components/QuizComponent'
 import ResultsScreen from './components/ResultsScreen'
 import LandingPage from './components/LandingPage'
+import SafetyInduction from './components/SafetyInduction'
 import AnimatedBackground from './components/AnimatedBackground'
 import { getTrainingData } from '../data/trainingData'
 import { useLanguage } from './contexts/LanguageContext'
 
 export default function Home() {
   const { language, t } = useLanguage()
-  const [currentView, setCurrentView] = useState('landing') // landing, home, video, quiz, results
+  const [currentView, setCurrentView] = useState('landing') // landing, home, video, quiz, results, safetyInduction
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
   const [quizResults, setQuizResults] = useState([])
   const [currentQuizAnswers, setCurrentQuizAnswers] = useState({})
@@ -84,6 +85,14 @@ export default function Home() {
 
   const handleStartTraining = () => {
     setCurrentView('home')
+  }
+
+  const handleStartSafetyInduction = () => {
+    setCurrentView('safetyInduction')
+  }
+
+  const handleBackToLanding = () => {
+    setCurrentView('landing')
   }
 
   const getCurrentQuiz = () => {
@@ -406,7 +415,9 @@ export default function Home() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'landing':
-        return <LandingPage onStartTraining={handleStartTraining} />
+        return <LandingPage onStartTraining={handleStartTraining} onStartSafetyInduction={handleStartSafetyInduction} />
+      case 'safetyInduction':
+        return <SafetyInduction onBack={handleBackToLanding} />
       case 'home':
         return renderHomeView()
       case 'video':

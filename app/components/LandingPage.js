@@ -29,7 +29,7 @@ import {
 import AnimatedBackground from './AnimatedBackground'
 import { useLanguage } from '../contexts/LanguageContext'
 
-export default function LandingPage({ onStartTraining }) {
+export default function LandingPage({ onStartTraining, onStartSafetyInduction }) {
   const [isHovered, setIsHovered] = useState(false)
   const { language, changeLanguage, t } = useLanguage()
   // Always show language selection first on each visit
@@ -464,13 +464,16 @@ export default function LandingPage({ onStartTraining }) {
           Enhance your skills with our comprehensive video training program
           </Typography> */}
 
-          {/* Start Training Button */}
+          {/* Action Buttons */}
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'center',
+              gap: { xs: 2, sm: 3 },
               mb: 5,
               animation: 'slideInUp 0.8s ease-out 0.8s both',
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: 'center',
             }}
           >
             <Button
@@ -487,10 +490,32 @@ export default function LandingPage({ onStartTraining }) {
                 borderRadius: '20px',
                 transform: isHovered ? 'translateY(-5px) scale(1.05)' : 'translateY(0) scale(1)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                direction: language === 'ar' ? 'rtl' : 'ltr'
+                direction: language === 'ar' ? 'rtl' : 'ltr',
+                minWidth: { xs: '250px', sm: 'auto' }
               }}
             >
               {t('startTraining')}
+            </Button>
+            
+            <Button
+              variant="contained"
+              size="large"
+              onClick={onStartSafetyInduction}
+              startIcon={<Security />}
+              className="crystal-button crystal-button-primary"
+              sx={{
+                fontSize: { xs: '1.1rem', sm: '1.3rem' },
+                padding: { xs: '16px 32px', sm: '20px 40px' },
+                borderRadius: '20px',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                direction: language === 'ar' ? 'rtl' : 'ltr',
+                minWidth: { xs: '250px', sm: 'auto' },
+                '&:hover': {
+                  transform: 'translateY(-5px) scale(1.05)',
+                }
+              }}
+            >
+              {t('safetyInduction')}
             </Button>
           </Box>
         </Box>
