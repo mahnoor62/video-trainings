@@ -17,7 +17,9 @@ import {
   Fullscreen,
   FullscreenExit,
   VolumeUp,
-  VolumeOff
+  VolumeOff,
+  Replay10,
+  Forward10
 } from '@mui/icons-material'
 import { useLanguage } from '../contexts/LanguageContext'
 import { getSafetyInductionVideoUrl } from '../../data/trainingData'
@@ -91,6 +93,83 @@ export default function SafetyInduction({ onBack }) {
   const pauseTimeoutRef = useRef(null)
   const videoContainerRef = useRef(null)
 
+  // Helper function to check if there's a question at a specific time
+  const checkForQuestionAtTime = (time) => {
+    if (currentQuestion || isProcessingAnswer || isInAnswerSegment) return
+
+    const questionToShow = questions.find((q) => {
+      if (answeredQuestions.includes(q.id)) return false
+      const pauseTime = timeToSeconds(q.pauseTime)
+      return time >= pauseTime - 0.1 && time < pauseTime + 0.5
+    })
+
+    if (questionToShow) {
+      const videoElement = videoRef.current
+      if (videoElement) {
+        videoElement.pause()
+        setIsPlaying(false)
+        setCurrentQuestion(questionToShow)
+      }
+    }
+  }
+
+  // Helper function to check if current time is in a segment that should be skipped
+  // based on user's previous answers, and skip to appropriate time if needed
+  const checkAndSkipSegments = (time, forceCheck = false) => {
+    // Allow skip check during manual seeks even if in answer segment
+    if (!forceCheck && (isProcessingAnswer || isInAnswerSegment)) {
+      return null
+    }
+
+    // Check each answered question to see if we're in a segment that should be skipped
+    for (const questionId of answeredQuestions) {
+      const question = questions.find(q => q.id === questionId)
+      if (!question) continue
+
+      const wasCorrect = questionResults[questionId]
+      const correctStart = timeToSeconds(question.correctSkip)
+      const correctEnd = timeToSeconds(question.correctEnd)
+      const wrongStart = timeToSeconds(question.wrongSkip)
+      const wrongEnd = timeToSeconds(question.wrongEnd)
+
+      if (wasCorrect) {
+        // User answered CORRECTLY - they should see correct segment, skip wrong segment
+        // Check if we're in the wrong segment that should be skipped
+        if (time >= wrongStart && time < wrongEnd) {
+          // We're in wrong segment, skip it
+          const skipTime = wrongStart > correctEnd ? wrongEnd : correctStart
+          return skipTime
+        }
+        // Also check if we're in the gap between correct end and wrong start
+        if (wrongStart > correctEnd && time >= correctEnd && time < wrongStart) {
+          // We're in the gap, skip to wrong end to continue
+          return wrongEnd
+        }
+      } else {
+        // User answered INCORRECTLY - they should see wrong segment, skip correct segment
+        // Check if we're in the correct segment that should be skipped
+        if (time >= correctStart && time < correctEnd) {
+          // We're in correct segment, skip it
+          const skipTime = wrongStart > correctEnd ? wrongStart : wrongEnd
+          return skipTime
+        }
+        // Also check if we're in the gap between wrong end and correct start
+        if (wrongEnd < correctStart && time >= wrongEnd && time < correctStart) {
+          // We're in the gap, this is fine - allow it
+          return null
+        }
+        // If wrong comes after correct and we're past correct end but before wrong start
+        // (e.g., Q1: correct 3:19-3:42, wrong 3:43-3:56, if at 3:42.5, skip to 3:43)
+        if (wrongStart > correctEnd && time >= correctEnd && time < wrongStart) {
+          // We're in the gap, skip to wrong start
+          return wrongStart
+        }
+      }
+    }
+
+    return null
+  }
+
   useEffect(() => {
     const videoElement = videoRef.current
     if (!videoElement) return
@@ -140,6 +219,23 @@ export default function SafetyInduction({ onBack }) {
         }
       }
 
+      // Check if we're in a segment that should be skipped based on previous answers
+      // This must happen BEFORE checking for questions and must be very aggressive
+      if (!isInAnswerSegment && !isProcessingAnswer && !currentQuestion) {
+        const skipTo = checkAndSkipSegments(current)
+        if (skipTo !== null) {
+          // Skip immediately if we're in a segment that should be skipped
+          // Use a small threshold (0.1 seconds) to catch even small overlaps
+          if (Math.abs(current - skipTo) > 0.1) {
+            // Immediately skip to the correct segment - this prevents any playback of skipped content
+            videoElement.currentTime = skipTo
+            setCurrentTime(skipTo)
+            // Don't check for questions at the skipped time, return early
+            return
+          }
+        }
+      }
+
       // Check if we need to pause for a question
       if (!currentQuestion && !isProcessingAnswer && !isInAnswerSegment) {
         const questionToShow = questions.find((q, index) => {
@@ -164,14 +260,42 @@ export default function SafetyInduction({ onBack }) {
       setVideoCompleted(true)
     }
 
+    const handleSeeked = () => {
+      // Check if we're in a segment that should be skipped based on previous answers
+      // Force check even if in answer segment (user manually sought)
+      const current = videoElement.currentTime
+      const skipTo = checkAndSkipSegments(current, true)
+      if (skipTo !== null && Math.abs(current - skipTo) > 0.5) {
+        // Immediately skip to the correct segment
+        videoElement.currentTime = skipTo
+        setCurrentTime(skipTo)
+        // After skipping, check for questions at the new position
+        setTimeout(() => {
+          const newTime = videoElement.currentTime
+          checkForQuestionAtTime(newTime)
+          // Double-check we're not still in a skipped segment (force check)
+          const skipToAgain = checkAndSkipSegments(newTime, true)
+          if (skipToAgain !== null && Math.abs(newTime - skipToAgain) > 0.5) {
+            videoElement.currentTime = skipToAgain
+            setCurrentTime(skipToAgain)
+          }
+        }, 100)
+      } else {
+        // Check for questions when user seeks to a new position
+        checkForQuestionAtTime(current)
+      }
+    }
+
     videoElement.addEventListener('loadedmetadata', handleLoadedMetadata)
     videoElement.addEventListener('timeupdate', handleTimeUpdate)
     videoElement.addEventListener('ended', handleEnded)
+    videoElement.addEventListener('seeked', handleSeeked)
 
     return () => {
       videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata)
       videoElement.removeEventListener('timeupdate', handleTimeUpdate)
       videoElement.removeEventListener('ended', handleEnded)
+      videoElement.removeEventListener('seeked', handleSeeked)
       if (pauseTimeoutRef.current) {
         clearTimeout(pauseTimeoutRef.current)
       }
@@ -236,6 +360,82 @@ export default function SafetyInduction({ onBack }) {
       videoElement.play()
       setIsPlaying(true)
     }
+  }
+
+  const handleSeekForward = () => {
+    const videoElement = videoRef.current
+    if (!videoElement || duration === 0) return
+
+    let newTime = Math.min(videoElement.currentTime + 10, duration)
+    
+    // Check if the new time is in a segment that should be skipped (force check even if in answer segment)
+    let skipTo = checkAndSkipSegments(newTime, true)
+    let iterations = 0
+    // Keep checking until we find a valid time (not in a skipped segment)
+    while (skipTo !== null && Math.abs(newTime - skipTo) > 0.5 && iterations < 10) {
+      newTime = skipTo
+      skipTo = checkAndSkipSegments(newTime, true)
+      iterations++
+      // Prevent infinite loop
+      if (skipTo !== null && Math.abs(newTime - skipTo) < 0.5) break
+    }
+    
+    // Set the time immediately - this must happen synchronously
+    videoElement.currentTime = newTime
+    setCurrentTime(newTime)
+    
+    // Immediately check again after setting (sometimes the video doesn't update instantly)
+    requestAnimationFrame(() => {
+      const current = videoElement.currentTime
+      const finalSkip = checkAndSkipSegments(current, true)
+      if (finalSkip !== null && Math.abs(current - finalSkip) > 0.5) {
+        videoElement.currentTime = finalSkip
+        setCurrentTime(finalSkip)
+      }
+      // Check if we landed on a question time
+      setTimeout(() => {
+        const finalTime = videoElement.currentTime
+        checkForQuestionAtTime(finalTime)
+      }, 50)
+    })
+  }
+
+  const handleSeekBackward = () => {
+    const videoElement = videoRef.current
+    if (!videoElement || duration === 0) return
+
+    let newTime = Math.max(videoElement.currentTime - 10, 0)
+    
+    // Check if the new time is in a segment that should be skipped (force check even if in answer segment)
+    let skipTo = checkAndSkipSegments(newTime, true)
+    let iterations = 0
+    // Keep checking until we find a valid time (not in a skipped segment)
+    while (skipTo !== null && Math.abs(newTime - skipTo) > 0.5 && iterations < 10) {
+      newTime = skipTo
+      skipTo = checkAndSkipSegments(newTime, true)
+      iterations++
+      // Prevent infinite loop
+      if (skipTo !== null && Math.abs(newTime - skipTo) < 0.5) break
+    }
+    
+    // Set the time immediately - this must happen synchronously
+    videoElement.currentTime = newTime
+    setCurrentTime(newTime)
+    
+    // Immediately check again after setting (sometimes the video doesn't update instantly)
+    requestAnimationFrame(() => {
+      const current = videoElement.currentTime
+      const finalSkip = checkAndSkipSegments(current, true)
+      if (finalSkip !== null && Math.abs(current - finalSkip) > 0.5) {
+        videoElement.currentTime = finalSkip
+        setCurrentTime(finalSkip)
+      }
+      // Check if we landed on a question time
+      setTimeout(() => {
+        const finalTime = videoElement.currentTime
+        checkForQuestionAtTime(finalTime)
+      }, 50)
+    })
   }
 
   const handleSeek = (event) => {
@@ -324,7 +524,7 @@ export default function SafetyInduction({ onBack }) {
   const correctAnswers = Object.values(questionResults).filter(result => result === true).length
   const scorePercentage = questions.length > 0 ? (correctAnswers / questions.length) * 100 : 0
 
-  // Restart handler - resets all state and restarts video
+  // Retake Quiz handler - resets all state and restarts video
   const handleRestart = () => {
     const videoElement = videoRef.current
     if (videoElement) {
@@ -609,7 +809,7 @@ export default function SafetyInduction({ onBack }) {
             </Box>
           )}
 
-          {/* Video Controls - Play/Pause, Mute, and Fullscreen */}
+          {/* Video Controls - Play/Pause, Seek, Time, Mute, and Fullscreen */}
           <Box
             sx={{
               position: 'absolute',
@@ -619,24 +819,77 @@ export default function SafetyInduction({ onBack }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              zIndex: 5
+              gap: 1,
+              zIndex: 5,
+              flexWrap: 'wrap'
             }}
           >
-            <Button
-              onClick={handlePlay}
-              sx={{
-                color: 'white',
-                minWidth: 'auto',
-                padding: '12px',
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button
+                onClick={handleSeekBackward}
+                sx={{
+                  color: 'white',
+                  minWidth: 'auto',
+                  padding: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  borderRadius: '8px',
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                  }
+                }}
+                title="Rewind 10 seconds"
+              >
+                <Replay10 />
+              </Button>
+
+              <Button
+                onClick={handlePlay}
+                sx={{
+                  color: 'white',
+                  minWidth: 'auto',
+                  padding: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  borderRadius: '8px',
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                  }
+                }}
+              >
+                {isPlaying ? <Pause /> : <PlayArrow />}
+              </Button>
+
+              <Button
+                onClick={handleSeekForward}
+                sx={{
+                  color: 'white',
+                  minWidth: 'auto',
+                  padding: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  borderRadius: '8px',
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                  }
+                }}
+                title="Forward 10 seconds"
+              >
+                <Forward10 />
+              </Button>
+            </Box>
+
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: 'white', 
+                minWidth: 100,
+                textAlign: 'center',
+                fontWeight: 500,
                 backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                borderRadius: '8px',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.7)'
-                }
+                padding: '8px 12px',
+                borderRadius: '8px'
               }}
             >
-              {isPlaying ? <Pause /> : <PlayArrow />}
-            </Button>
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </Typography>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Button
@@ -762,4 +1015,5 @@ export default function SafetyInduction({ onBack }) {
     </Container>
   )
 }
+
 

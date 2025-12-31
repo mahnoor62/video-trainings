@@ -44,7 +44,7 @@ export const translations = {
     safetyInductionProgress: "You answered",
     safetyInductionQuestionsCorrect: "questions correctly out of",
     safetyInductionTotalQuestions: "questions",
-    safetyInductionRestart: "Restart",
+    safetyInductionRestart: "Retake Quiz",
     safetyInductionBackToHome: "Back to Home",
 
     // Quiz Component
@@ -207,7 +207,7 @@ export const translations = {
     safetyInductionProgress: "لقد أجبت على",
     safetyInductionQuestionsCorrect: "سؤال بشكل صحيح من أصل",
     safetyInductionTotalQuestions: "سؤال",
-    safetyInductionRestart: "إعادة التشغيل",
+    safetyInductionRestart: "إعادة الاختبار",
     safetyInductionBackToHome: "العودة إلى الصفحة الرئيسية",
 
     // Quiz Component
