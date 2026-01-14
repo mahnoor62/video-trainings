@@ -29,7 +29,7 @@ const getTrainingData = (lang = 'en') => {
     },
     safetyInduction: {
       en: '/safety-induction/video.mp4',
-      ar: '/safety-induction/video.mp4'
+      ar: '/safety-induction/video-ar.mp4'
     }
   }
 
