@@ -39,39 +39,39 @@ const timeToSeconds = (timeString) => {
 const questions = [
   {
     id: 1,
-    pauseTime: '3:19',
+    pauseTime: '3:33',
     correctAnswer: 'B',
-    correctSkip: '3:19', // Start correct answer segment
-    correctEnd: '3:42', // End of correct answer segment
-    wrongSkip: '3:43', // Start wrong answer segment
-    wrongEnd: '3:56', // End of wrong answer segment
+    correctSkip: '3:33', // Start correct answer segment
+    correctEnd: '3:57', // End of correct answer segment (before incorrect segment starts)
+    wrongSkip: '3:57', // Start wrong answer segment
+    wrongEnd: '4:10', // End of wrong answer segment
   },
   {
     id: 2,
-    pauseTime: '4:16',
+    pauseTime: '4:31',
     correctAnswer: 'B',
-    wrongSkip: '4:17', // Start wrong answer segment
-    wrongEnd: '4:33', // End of wrong answer segment
-    correctSkip: '4:34', // Start correct answer segment
-    correctEnd: '4:45', // End of correct answer segment
+    wrongSkip: '4:32', // Start wrong answer segment
+    wrongEnd: '4:49', // End of wrong answer segment (before correct segment starts)
+    correctSkip: '4:50', // Start correct answer segment
+    correctEnd: '4:59', // End of correct answer segment
   },
   {
     id: 3,
-    pauseTime: '4:58',
+    pauseTime: '5:13',
     correctAnswer: 'A',
-    wrongSkip: '4:58', // Start wrong answer segment
-    wrongEnd: '5:08', // End of wrong answer segment
-    correctSkip: '5:09', // Start correct answer segment
-    correctEnd: '5:18', // End of correct answer segment
+    wrongSkip: '5:13', // Start wrong answer segment
+    wrongEnd: '5:23', // End of wrong answer segment (before correct segment starts)
+    correctSkip: '5:23', // Start correct answer segment
+    correctEnd: '5:33', // End of correct answer segment
   },
   {
     id: 4,
-    pauseTime: '5:55',
+    pauseTime: '6:08',
     correctAnswer: 'A',
-    wrongSkip: '5:55', // Start wrong answer segment
-    wrongEnd: '6:00', // End of wrong answer segment
-    correctSkip: '6:00', // Start correct answer segment
-    correctEnd: '6:09', // End of correct answer segment
+    wrongSkip: '6:09', // Start wrong answer segment
+    wrongEnd: '6:15', // End of wrong answer segment (before correct segment starts)
+    correctSkip: '6:15', // Start correct answer segment
+    correctEnd: '6:23', // End of correct answer segment
   }
 ]
 

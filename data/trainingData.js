@@ -28,7 +28,7 @@ const getTrainingData = (lang = 'en') => {
       ar: '/videos/Cpr-Arabic.mp4'
     },
     safetyInduction: {
-      en: '/safety-induction/video.mp4',
+      en: '/safety-induction/en-new-video.mp4',
       ar: '/safety-induction/video-ar.mp4'
     }
   }
