@@ -267,19 +267,58 @@ export default function SafetyInduction({ onBack }) {
     if (!videoElement) return
 
     const handleLoadedMetadata = () => {
+      console.log('handleLoadedMetadata: language=', language, 'videoUrl=', videoUrl)
       setDuration(videoElement.duration)
       // Start video from the beginning
       videoElement.currentTime = 0
       setCurrentTime(0)
       // Sync muted state
       setIsMuted(videoElement.muted)
-      // Auto-play the video when metadata is loaded
-      videoElement.play().then(() => {
-        setIsPlaying(true)
-      }).catch((error) => {
-        console.log('Autoplay failed:', error)
-        setIsPlaying(false)
-      })
+
+      // Debug logs for autoplay behavior
+      try {
+        console.log('handleLoadedMetadata: duration=', videoElement.duration, 'muted=', videoElement.muted)
+      } catch (e) {
+        console.log('handleLoadedMetadata: failed to read video properties', e)
+      }
+
+      // Auto-play logic with detailed logs to detect autoplay/mute restrictions
+      (async () => {
+        try {
+          const prevMuted = videoElement.muted
+          console.log('handleLoadedMetadata: attempting unmuted autoplay (temp unmute). prevMuted=', prevMuted)
+          // Try unmuted autoplay first
+          videoElement.muted = false
+          try {
+            await videoElement.play()
+            console.log('handleLoadedMetadata: unmuted autoplay succeeded')
+            setIsPlaying(true)
+            setIsMuted(false)
+            return
+          } catch (unmutedErr) {
+            console.warn('handleLoadedMetadata: unmuted autoplay rejected:', unmutedErr && (unmutedErr.name || unmutedErr.message) || unmutedErr)
+            // Try muted autoplay as fallback
+            videoElement.muted = true
+            try {
+              await videoElement.play()
+              console.log('handleLoadedMetadata: muted autoplay succeeded (fallback)')
+              setIsPlaying(true)
+              setIsMuted(true)
+              return
+            } catch (mutedErr) {
+              console.error('handleLoadedMetadata: muted autoplay also failed:', mutedErr && (mutedErr.name || mutedErr.message) || mutedErr)
+              // restore previous muted state
+              videoElement.muted = prevMuted
+              setIsMuted(prevMuted)
+              setIsPlaying(false)
+              return
+            }
+          }
+        } catch (err) {
+          console.error('handleLoadedMetadata: unexpected error during autoplay attempts', err)
+          setIsPlaying(false)
+        }
+      })()
     }
 
     const handleTimeUpdate = () => {
@@ -361,20 +400,42 @@ export default function SafetyInduction({ onBack }) {
       // Check if we're in a segment that should be skipped based on previous answers
       // Force check even if in answer segment (user manually sought)
       const current = videoElement.currentTime
+      console.log('handleSeeked: currentTime=', current)
+
       const skipTo = checkAndSkipSegments(current, true)
+      console.log('handleSeeked: checkAndSkipSegments returned', skipTo)
+
+      let finalTime = current
       if (skipTo !== null && Math.abs(current - skipTo) > 0.5) {
-        // Immediately skip to the correct segment
-        videoElement.currentTime = skipTo
-        setCurrentTime(skipTo)
+        finalTime = skipTo
+        console.log('handleSeeked: will skip to', finalTime)
+      }
+
+      // Check if we've skipped past an unanswered question
+      const skippedQuestionTime = checkForSkippedQuestion(finalTime)
+      console.log('handleSeeked: checkForSkippedQuestion returned', skippedQuestionTime)
+      if (skippedQuestionTime !== null) {
+        finalTime = skippedQuestionTime
+        console.log('handleSeeked: adjusting finalTime to skippedQuestionTime=', finalTime)
+      }
+
+      if (finalTime !== current) {
+        // Immediately skip to the correct position
+        videoElement.currentTime = finalTime
+        setCurrentTime(finalTime)
+        console.log('handleSeeked: jumped to', finalTime)
         // After skipping, check for questions at the new position
         setTimeout(() => {
           const newTime = videoElement.currentTime
+          console.log('handleSeeked: after jump currentTime=', newTime)
           checkForQuestionAtTime(newTime)
           // Double-check we're not still in a skipped segment (force check)
           const skipToAgain = checkAndSkipSegments(newTime, true)
+          console.log('handleSeeked: second checkAndSkipSegments returned', skipToAgain)
           if (skipToAgain !== null && Math.abs(newTime - skipToAgain) > 0.5) {
             videoElement.currentTime = skipToAgain
             setCurrentTime(skipToAgain)
+            console.log('handleSeeked: applied skipToAgain ->', skipToAgain)
           }
         }, 100)
       } else {
@@ -465,12 +526,14 @@ export default function SafetyInduction({ onBack }) {
     if (!videoElement || duration === 0) return
 
     let newTime = Math.min(videoElement.currentTime + 10, duration)
+    console.log('handleSeekForward: currentTime=', videoElement.currentTime, 'proposed newTime=', newTime)
 
     // Check if the new time is in a segment that should be skipped (force check even if in answer segment)
     let skipTo = checkAndSkipSegments(newTime, true)
     let iterations = 0
     // Keep checking until we find a valid time (not in a skipped segment)
     while (skipTo !== null && Math.abs(newTime - skipTo) > 0.5 && iterations < 10) {
+      console.log('handleSeekForward: skipTo found=', skipTo, 'iteration=', iterations)
       newTime = skipTo
       skipTo = checkAndSkipSegments(newTime, true)
       iterations++
@@ -480,13 +543,16 @@ export default function SafetyInduction({ onBack }) {
 
     // Check if we've skipped past an unanswered question
     const skippedQuestionTime = checkForSkippedQuestion(newTime)
+    console.log('handleSeekForward: skippedQuestionTime=', skippedQuestionTime)
     if (skippedQuestionTime !== null) {
+      console.log('handleSeekForward: adjusting newTime to skippedQuestionTime=', skippedQuestionTime)
       newTime = skippedQuestionTime
     }
 
     // Set the time immediately - this must happen synchronously
     videoElement.currentTime = newTime
     setCurrentTime(newTime)
+    console.log('handleSeekForward: finalTime set=', newTime)
 
     // Immediately check again after setting (sometimes the video doesn't update instantly)
     requestAnimationFrame(() => {
@@ -515,12 +581,13 @@ export default function SafetyInduction({ onBack }) {
     if (!videoElement || duration === 0) return
 
     let newTime = Math.max(videoElement.currentTime - 10, 0)
-
+    console.log('handleSeekBackward: currentTime=', videoElement.currentTime, 'proposed newTime=', newTime)
     // Check if the new time is in a segment that should be skipped (force check even if in answer segment)
     let skipTo = checkAndSkipSegments(newTime, true)
     let iterations = 0
     // Keep checking until we find a valid time (not in a skipped segment)
     while (skipTo !== null && Math.abs(newTime - skipTo) > 0.5 && iterations < 10) {
+      console.log('handleSeekBackward: skipTo found=', skipTo, 'iteration=', iterations)
       newTime = skipTo
       skipTo = checkAndSkipSegments(newTime, true)
       iterations++
@@ -530,13 +597,16 @@ export default function SafetyInduction({ onBack }) {
 
     // Check if we've skipped past an unanswered question
     const skippedQuestionTime = checkForSkippedQuestion(newTime)
+    console.log('handleSeekBackward: skippedQuestionTime=', skippedQuestionTime)
     if (skippedQuestionTime !== null) {
+      console.log('handleSeekBackward: adjusting newTime to skippedQuestionTime=', skippedQuestionTime)
       newTime = skippedQuestionTime
     }
 
     // Set the time immediately - this must happen synchronously
     videoElement.currentTime = newTime
     setCurrentTime(newTime)
+    console.log('handleSeekBackward: finalTime set=', newTime)
 
     // Immediately check again after setting (sometimes the video doesn't update instantly)
     requestAnimationFrame(() => {
@@ -917,6 +987,7 @@ export default function SafetyInduction({ onBack }) {
               height: '100%',
               objectFit: 'contain'
             }}
+            muted={false}
             playsInline
             controls={false}
             onContextMenu={(e) => e.preventDefault()}
